@@ -113,7 +113,7 @@ function initMap(){
   map.fitBounds(bounds); map.setMaxBounds([[-H*.15,-W*.15],[H*1.15,W*1.15]]);
 
   fieldPane=map.createPane('fields'); fieldPane.classList.add('fieldpane');
-  fieldPane.style.zIndex=350;
+  fieldPane.style.zIndex=450;
   const keys=['caco3_flux','caco3_content','opal_flux','opal_content','toc_flux','F','ccd_class'];
   keys.forEach(k=>{ overlays[k]=L.imageOverlay('data/layer_'+k+'.png',bounds,
     {pane:'fields',interactive:false,className:'lyr-'+k}); });
