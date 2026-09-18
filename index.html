@@ -1,0 +1,207 @@
+<!doctype html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>全球海底场浏览器</title>
+<link rel="stylesheet" href="vendor/leaflet.css">
+<style>
+  html,body{margin:0;height:100%;background:#0b0f16;color:#cbd5e1;
+    font:13px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"PingFang SC","Microsoft YaHei",sans-serif}
+  #map{position:absolute;inset:0;background:#0b0f16}
+  .leaflet-container{background:#0b0f16}
+  .fieldpane{mix-blend-mode:multiply}          /* 场色 × 地形明暗 */
+  .panel{position:absolute;z-index:1000;background:rgba(13,18,26,.85);
+    border:1px solid rgba(148,163,184,.18);border-radius:10px;
+    backdrop-filter:blur(9px);-webkit-backdrop-filter:blur(9px)}
+  /* 左上 图层面板 */
+  #layers{top:14px;left:14px;width:210px;padding:12px 13px 13px}
+  #layers h1{margin:0 0 2px;font-size:14px;font-weight:600;color:#e2e8f0}
+  #layers .sub{font-size:10.5px;color:#6b7a90;margin-bottom:10px}
+  .lyr{display:flex;align-items:center;gap:8px;padding:6px 8px;border-radius:7px;cursor:pointer;
+    font-size:12px;color:#aebbcd;transition:background .12s}
+  .lyr:hover{background:rgba(148,163,184,.08)}
+  .lyr.on{background:rgba(56,140,240,.16);color:#e8eef7}
+  .lyr .dot{width:9px;height:9px;border-radius:50%;flex:0 0 auto;background:#3a4658}
+  .lyr.on .dot{background:#5ea0ff}
+  .grp{font-size:10px;color:#5b6a80;text-transform:uppercase;letter-spacing:.6px;margin:10px 2px 3px}
+  /* 图例 */
+  #legend{bottom:16px;left:14px;padding:11px 13px;min-width:190px}
+  #legend .lg-title{font-size:11.5px;color:#cbd5e1;margin-bottom:3px;font-weight:600}
+  #legend .lg-unit{font-size:10px;color:#6b7a90;margin-bottom:7px}
+  #legend .bar{height:10px;border-radius:3px}
+  #legend .ticks{display:flex;justify-content:space-between;font-size:10px;color:#7b8aa0;margin-top:3px}
+  #legend .sw{display:flex;align-items:center;gap:7px;margin:4px 0;font-size:11.5px;color:#aebbcd}
+  #legend .sw i{width:13px;height:13px;border-radius:3px;display:inline-block}
+  #legend .fade{font-size:10px;color:#6b7a90;margin-top:8px;line-height:1.35}
+  /* 右 信息面板 */
+  #info{top:14px;right:14px;width:224px;padding:0;overflow:hidden}
+  #info .hd{padding:10px 13px;border-bottom:1px solid rgba(148,163,184,.14);
+    font-size:11.5px;color:#8ea0b8;font-variant-numeric:tabular-nums}
+  #info .hd b{color:#e2e8f0;font-size:13px}
+  #info .body{padding:6px 13px 12px}
+  #info .row{display:flex;justify-content:space-between;gap:10px;padding:3px 0;font-size:11.5px;
+    border-bottom:1px solid rgba(148,163,184,.06)}
+  #info .row .k{color:#7b8aa0}
+  #info .row .v{color:#d3dcea;font-variant-numeric:tabular-nums;text-align:right}
+  #info .grp2{font-size:10px;color:#5b6a80;text-transform:uppercase;letter-spacing:.5px;margin:9px 0 1px}
+  #info .empty{padding:16px 13px;color:#6b7a90;font-size:11.5px}
+  .leaflet-control-zoom{border:none!important;box-shadow:none!important;margin:14px!important}
+  .leaflet-control-zoom a{background:rgba(13,18,26,.85)!important;color:#cbd5e1!important;
+    border:1px solid rgba(148,163,184,.18)!important;width:28px;height:28px;line-height:28px}
+  #hint{position:absolute;bottom:16px;left:50%;transform:translateX(-50%);z-index:1000;
+    font-size:10.5px;color:#5b6a80}
+</style>
+</head>
+<body>
+<div id="map"></div>
+
+<div id="layers" class="panel">
+  <h1>全球海底场</h1>
+  <div class="sub">Equal Earth · 地形=明暗，场=颜色</div>
+  <div id="lyrlist"></div>
+</div>
+
+<div id="legend" class="panel"></div>
+
+<div id="info" class="panel">
+  <div id="infohd" class="hd">移动到海底任一点</div>
+  <div id="infobody" class="empty">悬停查看该点全部场信息</div>
+</div>
+
+<div id="hint">滚轮/拖拽缩放 · 悬停查点 · 左侧切换场</div>
+
+<script src="vendor/leaflet.js"></script>
+<script>
+const A1=1.340264,A2=-0.081106,A3=0.000893,A4=0.003796,SQ3=Math.sqrt(3);
+function eeInverse(x,y){
+  let th=y;
+  for(let i=0;i<18;i++){const f=A4*th**9+A3*th**7+A2*th**3+A1*th-y,
+    fp=9*A4*th**8+7*A3*th**6+3*A2*th**2+A1; th-=f/fp;}
+  const d=9*A4*th**8+7*A3*th**6+3*A2*th**2+A1;
+  const phi=Math.asin(Math.max(-1,Math.min(1,Math.sin(th)*2/SQ3)));
+  const lam=3*d*x/(2*SQ3*Math.cos(th));
+  return [phi*180/Math.PI, lam*180/Math.PI, Math.abs(lam)<=Math.PI+1e-9];
+}
+
+const LAYERS=[
+  {grp:'CaCO₃', items:[['caco3_flux','CaCO₃ 通量'],['caco3_content','CaCO₃ 含量']]},
+  {grp:'Opal',  items:[['opal_flux','Opal 通量'],['opal_content','Opal 含量']]},
+  {grp:'其他',  items:[['toc_flux','TOC 通量'],['F','²³⁰Th 质量通量 F'],['ccd_class','CCD 供给门控分类']]},
+];
+
+let meta, legends, FD, gridIndex={}, overlays={}, active=null, fieldPane, MAP;
+
+Promise.all([
+  fetch('data/meta.json').then(r=>r.json()),
+  fetch('data/legends.json').then(r=>r.json()),
+  fetch('data/fields.json').then(r=>r.json()),
+]).then(([m,lg,fd])=>{
+  meta=m; legends=lg; FD=fd;
+  // 逐点索引：整数经纬网格
+  for(let i=0;i<fd.n;i++){ gridIndex[Math.round(fd.lat[i])+'_'+Math.round(fd.lon[i])]=i; }
+  initMap();
+});
+
+function initMap(){
+  const W=meta.width,H=meta.height,Xmax=meta.Xmax,Ymax=meta.Ymax;
+  const map=L.map('map',{crs:L.CRS.Simple,minZoom:-3,maxZoom:6,zoomSnap:0,zoomDelta:.5,
+    wheelPxPerZoomLevel:90,attributionControl:false,maxBoundsViscosity:.7});
+  MAP=map;
+  const bounds=[[0,0],[H,W]];
+  L.imageOverlay('data/terrain.png',bounds,{interactive:false}).addTo(map);
+  map.fitBounds(bounds); map.setMaxBounds([[-H*.15,-W*.15],[H*1.15,W*1.15]]);
+
+  fieldPane=map.createPane('fields'); fieldPane.classList.add('fieldpane');
+  fieldPane.style.zIndex=350;
+  const keys=['caco3_flux','caco3_content','opal_flux','opal_content','toc_flux','F','ccd_class'];
+  keys.forEach(k=>{ overlays[k]=L.imageOverlay('data/layer_'+k+'.png',bounds,
+    {pane:'fields',interactive:false,className:'lyr-'+k}); });
+
+  buildLayerList();
+  setActive(null);                       // 默认只地形
+
+  const hd=document.getElementById('infohd'), body=document.getElementById('infobody');
+  map.on('mousemove',e=>{
+    const px=e.latlng.lng, py=H-e.latlng.lat;
+    const plx=px/W*2*Xmax-Xmax, ply=Ymax-py/H*2*Ymax;
+    const [lat,lon,ok]=eeInverse(plx,ply);
+    if(!ok||lat<-90||lat>90){ return; }
+    const idx=lookup(lat,lon);
+    renderInfo(hd,body,lat,lon,idx);
+  });
+}
+
+function lookup(lat,lon){
+  for(const [dla,dlo] of [[0,0],[0,1],[0,-1],[1,0],[-1,0],[1,1],[-1,-1],[1,-1],[-1,1]]){
+    const k=(Math.round(lat)+dla)+'_'+(Math.round(lon)+dlo);
+    if(k in gridIndex) return gridIndex[k];
+  }
+  return -1;
+}
+
+function renderInfo(hd,body,lat,lon,idx){
+  const ns=lat>=0?'N':'S',ew=lon>=0?'E':'W';
+  hd.innerHTML=`<b>${Math.abs(lat).toFixed(1)}°${ns} ${Math.abs(lon).toFixed(1)}°${ew}</b>`;
+  if(idx<0){ body.className='empty'; body.textContent='此处无深海网格点（陆地/浅水/图外）'; return; }
+  body.className='body';
+  const f=FD, g=(a)=>f[a][idx];
+  const fmt=(v,d=2,u='')=> (v===null||v===undefined)?'—':(v.toFixed?v.toFixed(d):v)+u;
+  let h='';
+  h+=`<div class="row"><span class="k">水深</span><span class="v">${g('depth')} m</span></div>`;
+  h+=`<div class="row"><span class="k">海盆</span><span class="v">${g('basin')}</span></div>`;
+  h+=`<div class="row"><span class="k">离最近岩芯</span><span class="v">${fmt(g('dcore'),0,' km')}</span></div>`;
+  h+=`<div class="grp2">CaCO₃</div>`;
+  h+=`<div class="row"><span class="k">通量 A</span><span class="v">${fmt(g('caco3_flux'),3)}</span></div>`;
+  h+=`<div class="row"><span class="k">含量</span><span class="v">${fmt(g('caco3_content'),1)}% ± ${fmt(g('caco3_sd'),1)}</span></div>`;
+  h+=`<div class="grp2">Opal</div>`;
+  h+=`<div class="row"><span class="k">通量 F_opal</span><span class="v">${fmt(g('opal_flux'),3)}</span></div>`;
+  h+=`<div class="row"><span class="k">含量</span><span class="v">${fmt(g('opal_content'),1)}% ± ${fmt(g('opal_sd'),1)}</span></div>`;
+  h+=`<div class="grp2">其他</div>`;
+  h+=`<div class="row"><span class="k">TOC 通量</span><span class="v">${fmt(g('toc_flux'),3)}</span></div>`;
+  h+=`<div class="row"><span class="k">质量通量 F</span><span class="v">${fmt(g('F'),3)}</span></div>`;
+  const cd=g('ccd_depth');
+  h+=`<div class="row"><span class="k">CCD 分类</span><span class="v">${ccdName(g('ccd_class'))}</span></div>`;
+  h+=`<div class="row"><span class="k">保存比</span><span class="v">${fmt(g('preserv'),2)}</span></div>`;
+  body.innerHTML=h;
+}
+function ccdName(c){return {preserved:'保存',dissolved:'溶解(真CCD)',supply_limited:'供给不足(假零)',insufficient:'数据不足'}[c]||c;}
+
+function buildLayerList(){
+  const el=document.getElementById('lyrlist'); let h='';
+  const mk=(k,lbl)=>`<div class="lyr" data-k="${k}"><span class="dot"></span>${lbl}</div>`;
+  h+=`<div class="lyr on" data-k=""><span class="dot"></span>仅地形</div>`;
+  LAYERS.forEach(G=>{ h+=`<div class="grp">${G.grp}</div>`; G.items.forEach(it=>h+=mk(it[0],it[1])); });
+  el.innerHTML=h;
+  el.querySelectorAll('.lyr').forEach(n=>n.onclick=()=>setActive(n.dataset.k||null));
+}
+
+function setActive(k){
+  if(active && overlays[active]) overlays[active].remove();
+  active=k;
+  document.querySelectorAll('#lyrlist .lyr').forEach(n=>n.classList.toggle('on',(n.dataset.k||null)===k));
+  if(k && overlays[k]) overlays[k].addTo(MAP);
+  renderLegend(k);
+}
+
+function renderLegend(k){
+  const el=document.getElementById('legend');
+  if(!k){ el.innerHTML=`<div class="lg-title">海底地形</div><div class="lg-unit">明暗 = 水深 + 光照浮雕</div>
+    <div class="bar" style="background:linear-gradient(90deg,#333,#8a8f98,#e8ebef)"></div>
+    <div class="ticks"><span>深 6000 m</span><span>浅 0</span></div>`; return; }
+  const L=legends[k];
+  if(L.type==='categorical'){
+    let s=`<div class="lg-title">${L.label}</div><div class="lg-unit">分类</div>`;
+    L.swatches.forEach(sw=>s+=`<div class="sw"><i style="background:${sw[0]}"></i>${sw[1]}</div>`);
+    el.innerHTML=s; return;
+  }
+  const grad=L.stops.map(s=>s[1]).join(',');
+  const lo=L.scale==='log'?L.vmin:L.vmin, hi=L.vmax;
+  el.innerHTML=`<div class="lg-title">${L.label}</div><div class="lg-unit">${L.unit}${L.scale==='log'?' · 对数':''}</div>
+    <div class="bar" style="background:linear-gradient(90deg,${grad})"></div>
+    <div class="ticks"><span>${lo}</span><span>${hi}</span></div>
+    ${L.has_sd?'<div class="fade">颜色越淡 = 不确定度越大（露出下方地形=数据空洞）</div>':''}`;
+}
+</script>
+</body>
+</html>
