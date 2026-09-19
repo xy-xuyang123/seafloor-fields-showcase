@@ -86,8 +86,7 @@ function eeInverse(x,y){
 
 const LAYERS=[
   {grp:'CaCO₃', items:[['caco3_flux','CaCO₃ 通量'],['caco3_content','CaCO₃ 含量']]},
-  {grp:'Opal',  items:[['opal_flux','Opal 通量'],['opal_content','Opal 含量']]},
-  {grp:'其他',  items:[['toc_flux','TOC 通量'],['F','²³⁰Th 质量通量 F'],['ccd_class','CCD 供给门控分类']]},
+  {grp:'其他',  items:[['F','²³⁰Th 质量通量 F'],['ccd_class','CCD 供给门控分类']]},
 ];
 
 let meta, legends, FD, gridIndex={}, overlays={}, active=null, fieldPane, MAP;
@@ -114,7 +113,7 @@ function initMap(){
 
   fieldPane=map.createPane('fields'); fieldPane.classList.add('fieldpane');
   fieldPane.style.zIndex=450;
-  const keys=['caco3_flux','caco3_content','opal_flux','opal_content','toc_flux','F','ccd_class'];
+  const keys=['caco3_flux','caco3_content','F','ccd_class'];
   keys.forEach(k=>{ overlays[k]=L.imageOverlay('data/layer_'+k+'.png',bounds,
     {pane:'fields',interactive:false,className:'lyr-'+k}); });
 
@@ -154,11 +153,7 @@ function renderInfo(hd,body,lat,lon,idx){
   h+=`<div class="grp2">CaCO₃</div>`;
   h+=`<div class="row"><span class="k">通量 A</span><span class="v">${fmt(g('caco3_flux'),3)}</span></div>`;
   h+=`<div class="row"><span class="k">含量</span><span class="v">${fmt(g('caco3_content'),1)}% ± ${fmt(g('caco3_sd'),1)}</span></div>`;
-  h+=`<div class="grp2">Opal</div>`;
-  h+=`<div class="row"><span class="k">通量 F_opal</span><span class="v">${fmt(g('opal_flux'),3)}</span></div>`;
-  h+=`<div class="row"><span class="k">含量</span><span class="v">${fmt(g('opal_content'),1)}% ± ${fmt(g('opal_sd'),1)}</span></div>`;
   h+=`<div class="grp2">其他</div>`;
-  h+=`<div class="row"><span class="k">TOC 通量</span><span class="v">${fmt(g('toc_flux'),3)}</span></div>`;
   h+=`<div class="row"><span class="k">质量通量 F</span><span class="v">${fmt(g('F'),3)}</span></div>`;
   const cd=g('ccd_depth');
   h+=`<div class="row"><span class="k">CCD 分类</span><span class="v">${ccdName(g('ccd_class'))}</span></div>`;
