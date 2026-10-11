@@ -8,4 +8,4 @@ low-confidence regions fade to bare terrain.
 
 **Live**: https://xy-xuyang123.github.io/seafloor-fields-showcase/
 
-Rendered layers only — methods, code and core data are in a separate research repository.
+Also includes a static content-vs-flux comparison figure (figures/content_vs_flux.png, linked from the layer panel). Rendered layers only — methods, code and core data are in a separate research repository.
