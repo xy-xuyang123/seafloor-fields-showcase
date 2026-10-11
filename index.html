@@ -169,7 +169,7 @@ function renderInfo(hd,body,lat,lon,idx){
   h+=`<div class="row"><span class="k">保存比</span><span class="v">${fmt(g('preserv'),2)}</span></div>`;
   body.innerHTML=h;
 }
-function ccdName(c){return {preserved:'保存',dissolved:'溶解(真CCD)',supply_limited:'供给不足(假零)',insufficient:'数据不足'}[c]||c;}
+function ccdName(c){return {preserved:'保存',dissolved:'溶解(真CCD)',supply_limited:'碳酸钙供给不足',insufficient:'数据不足'}[c]||c;}
 
 function buildLayerList(){
   const el=document.getElementById('lyrlist'); let h='';
