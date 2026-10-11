@@ -1,7 +1,7 @@
 # Global Seafloor Fields — Interactive Browser
 
 Interactive Equal-Earth browser of reconstructed global seafloor sediment fields:
-CaCO₃ content & flux and opal content & flux (v2 multiscale residual ladder), TOC (pending),
+CaCO₃ content & flux and opal content & flux (v2 multiscale residual ladder), TOC content (NN-TOC 2025) & flux (²³⁰Th F × NN-TOC),
 ²³⁰Th-normalized mass flux, and supply-gated CCD classification.
 Terrain hillshade carries brightness; fields carry color (multiply blend);
 low-confidence regions fade to bare terrain.
